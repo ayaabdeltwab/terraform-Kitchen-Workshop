@@ -1,73 +1,79 @@
+provider "aws" {
+  region = "us-east-1"
+}
+
 terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 4.0.0"  
-    }
-  }
   backend "s3" {
-    bucket = "ayaterraformbucket"
-    key    = "terraform.tfstate"
+    bucket = "ayaterrbucket"
+    key    = "terraform.statfile"
     region = "us-east-1"
   }
 }
 
-provider "aws" {
-  region = "us-east-1"
-}
-# Create variables 
-variable "Environment" {
-  description = "The environment for the S3 bucket"
-  default     = "terraformChamps"
-}
-variable "Owner" {
-  description = "The owner of the S3 bucket"
-  default     = "Ayaa"
-}
+# Create S3 bucket
+resource "aws_s3_bucket" "frogtechlogs" {
+  bucket = "frogtech-logs"
 
-# Create S3 bucket with name, force_destroy set to true, and tags
-resource "aws_s3_bucket" "task2" {
-  bucket              = "s3-task2"
-  force_destroy       = true
-  object_lock_enabled = false
+  # Force destroy even if the bucket is not empty
+  force_destroy = true
 
+  # Apply common tags
   tags = {
-    Name        = "s3-task2"
-    Environment = var.Environment
-    Owner       = var.Owner
+    Environment = "terraformChamps"
+    Owner       = "aya"
   }
 }
-# Create a logs directory 
-resource "aws_s3_object" "logs_dir" {
-  bucket = aws_s3_bucket.task2.id
-  key    = "logs/"
-}
-# Enable versioning on the S3 bucket
-resource "aws_s3_bucket_versioning" "versioning_bucket1" {
-  bucket = aws_s3_bucket.task2.id
+
+# Enable versioning
+resource "aws_s3_bucket_versioning" "versioning_frogtechlogs" {
+  bucket = aws_s3_bucket.frogtechlogs.id
+
   versioning_configuration {
     status = "Enabled"
   }
 }
-# Bucket Policy to Allow IAM User to Upload Objects Only in logs/
-data "aws_iam_policy_document" "upload-objects" {
-  statement {
-    principals {
-      type        = "AWS"
-      identifiers = ["data.aws_iam_user.iam_user.arn"]
-    }
 
-    actions = [
-      "s3:GetObject",
-      "s3:ListBucket",
-    ]
+# Set bucket ownership to BucketOwnerPreferred
+resource "aws_s3_bucket_ownership_controls" "frogtechlogs" {
+  bucket = aws_s3_bucket.frogtechlogs.id
 
-    resources = [
-      aws_s3_bucket.task2.arn,
-      "${aws_s3_bucket.task2.arn}/*",
-    ]
+  rule {
+    object_ownership = "BucketOwnerPreferred"
   }
 }
 
+# Block public access to the bucket
+resource "aws_s3_bucket_public_access_block" "frogtechlogs" {
+  bucket = aws_s3_bucket.frogtechlogs.id
 
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
 
+# Enable SSE-S3 encryption with bucket key enabled
+resource "aws_s3_bucket_server_side_encryption_configuration" "frogtechlogs_encryption" {
+  bucket = aws_s3_bucket.frogtechlogs.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"  # Using SSE-S3 (AES-256 encryption)
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# S3 Lifecycle rule to delete objects after 7 days
+resource "aws_s3_bucket_lifecycle_configuration" "frogtechlogs_lifecycle" {
+  bucket = aws_s3_bucket.frogtechlogs.id
+
+  rule {
+    id     = "log-expiration-rule"
+    status = "Enabled"
+
+    expiration {
+      days = 7
+    }
+  }
+}
