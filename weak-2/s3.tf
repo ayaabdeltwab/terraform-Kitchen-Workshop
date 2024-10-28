@@ -20,16 +20,6 @@ resource "aws_s3_bucket_versioning" "versioning_frogtechlogs" {
     status = "Enabled"
   }
 }
-
-# Set bucket ownership to BucketOwnerPreferred
-resource "aws_s3_bucket_ownership_controls" "frogtechlogs" {
-  bucket = aws_s3_bucket.frogtechlogs.id
-
-  rule {
-    object_ownership = "BucketOwnerPreferred"
-  }
-}
-
 # Block public access to the bucket
 resource "aws_s3_bucket_public_access_block" "frogtechlogs" {
   bucket = aws_s3_bucket.frogtechlogs.id
